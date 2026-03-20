@@ -22,15 +22,15 @@ export default async function Home() {
   }
 
   return (
-    <div style={{ padding: '20px' }}>
+    <main style={{ padding: '20px' }}>
       <h1>OcuBase</h1>
 
       {data.map((obs) => (
         <div key={obs.id} style={{ marginBottom: '20px' }}>
-          <h2>{obs.parameter.name}</h2>
+          <h2>{obs.parameter?.name}</h2>
 
-          <p><strong>Tissue:</strong> {obs.tissue.name}</p>
-          <p><strong>Study:</strong> {obs.source.title}</p>
+          <p><strong>Tissue:</strong> {obs.tissue?.name}</p>
+          <p><strong>Study:</strong> {obs.source?.title}</p>
 
           <p><strong>Method:</strong> {obs.method_type}</p>
           <p><strong>Context:</strong> {obs.measurement_context}</p>
@@ -45,6 +45,6 @@ export default async function Home() {
           )}
         </div>
       ))}
-    </div>
+    </main>
   )
 }
