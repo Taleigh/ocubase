@@ -3,38 +3,86 @@
 // -----------------------------
 // IMPORTS
 // -----------------------------
-// Navigation + React state + Supabase client
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
 
 export default function Home() {
 
   // -----------------------------
-  // STATE MANAGEMENT
+  // STATE
   // -----------------------------
-  // Stores user input (parameter query)
-  // Stores query results from database
-  const [parameter, setParameter] = useState('')
-  const [result, setResult] = useState(null)
+  const [parameters, setParameters] = useState([])   // dropdown options Parmaeter
+  const [tissue, setTissue] = useState([])   // dropdown options Tissue
+  const [selectedParam, setSelectedParam] = useState('') // selected parameter ID
+  const [selectedTissue, setSelectedTissue] = useState('') // selected Tissue ID
+  const [result, setResult] = useState(null)         // query results
 
 
   // -----------------------------
-  // DATABASE QUERY FUNCTION
+  // FETCH PARAMETERS (ON LOAD)
   // -----------------------------
-  // Fetches baseline data based on user input
-  const handleQuery = async () => {
-    if (!parameter) return
-
+  const fetchParameters = async () => {
     const { data, error } = await supabase
+      .from('parameter')
+      .select('id, name')
+
+    if (error) {
+      console.error(error)
+      return
+    }
+
+    setParameters(data)
+  }
+
+  useEffect(() => {
+    fetchParameters()
+  }, [])
+
+  // -----------------------------
+  // FETCH Tissues (ON LOAD)
+  // -----------------------------
+  const fetchTissue = async () => {
+    const { data, error } = await supabase
+      .from('tissue')
+      .select('id, name')
+
+    if (error) {
+      console.error(error)
+      return
+    }
+
+    setTissue(data)
+  }
+
+  useEffect(() => {
+    fetchTissue()
+  }, [])
+
+
+  // -----------------------------
+  // QUERY FUNCTION
+  // -----------------------------
+  const handleQuery = async () => {
+    if (!selectedParam) return
+
+    let query = supabase
       .from('observation')
       .select(`
         units,
         parameter(name),
+        tissue(name),
         measurement_agg(mean, sd, min, max, n)
       `)
-      .ilike('parameter.name', parameter)
+      .eq('parameter_id', Number(selectedParam))
+
+    // Apply tissue filter if selected
+    if (selectedTissue) {
+      query = query.eq('tissue_id', Number(selectedTissue))
+    }
+
+    const { data, error } = await query
 
     if (error) {
       console.error(error)
@@ -46,14 +94,12 @@ export default function Home() {
 
 
   // -----------------------------
-  // UI RENDER
+  // UI
   // -----------------------------
   return (
     <main style={{ padding: '20px' }}>
 
-      {/* -----------------------------
-          HEADER / NAVIGATION
-      ----------------------------- */}
+      {/* HEADER */}
       <h1>OcuBase</h1>
 
       <nav>
@@ -63,25 +109,39 @@ export default function Home() {
 
       <hr />
 
-
-      {/* -----------------------------
-          QUICK QUERY TOOL
-      ----------------------------- */}
+      {/* QUERY SECTION */}
       <h2>Quick Reference</h2>
 
-      <input
-        type="text"
-        placeholder="Enter parameter (e.g. corneal thickness)"
-        value={parameter}
-        onChange={(e) => setParameter(e.target.value)}
-      />
+      {/* DROPDOWN */}
+      <select
+        value={selectedParam}
+        onChange={(e) => setSelectedParam(e.target.value)}
+      >
+        <option value="">Select parameter</option>
 
-      <button onClick={handleQuery}>Get Baseline</button>
+        {parameters.map((param) => (
+          <option key={param.id} value={param.id}>
+            {param.name}
+          </option>
+        ))}
+      </select>
+      <select
+        value={selectedTissue}
+        onChange={(e) => setSelectedTissue(e.target.value)}
+      >
+        <option value="">Select Tissue</option>
+
+        {tissue.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </select>
+
+      <button onClick={handleQuery}>Get Reference Values</button>
 
 
-      {/* -----------------------------
-          QUERY RESULTS DISPLAY
-      ----------------------------- */}
+      {/* RESULTS */}
       {result && (
         <div style={{ marginTop: '20px' }}>
           {result.map((item, i) => (
