@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 
 export default function Submit() {
-
+  // States ----------------------------------------------------------------
   const [parameters, setParameters] = useState([])
   const [tissues, setTissues] = useState([])
   const [sources, setSources] = useState([])
@@ -15,7 +15,7 @@ export default function Submit() {
   const [ageRanges, setAgeRanges] = useState([])
   const [measurementType, setMeasurementType] = useState('agg')
   const [loading, setLoading] = useState(false)
-
+  const [healthConditions, setHealthConditions] = useState([])
   const [form, setForm] = useState({
     parameter_id: '',
     tissue_id: '',
@@ -24,7 +24,6 @@ export default function Submit() {
     measurement_context: '',
     units: ''
   })
-
   const [cohorts, setCohorts] = useState([
     {
       label: '',
@@ -39,7 +38,6 @@ export default function Submit() {
       max: ''
     }
   ])
-
   const [rawData, setRawData] = useState([
     {
       value: '',
@@ -49,7 +47,23 @@ export default function Submit() {
       age_range: ''
     }
   ])
+  const [showSourceForm, setShowSourceForm] = useState(false)
+  const [sourceDraft, setSourceDraft] = useState({
+  title: '',
+  doi: '',
+  journal: '',
+  year: ''
+  })
+  const [showAddParameter, setShowAddParameter] = useState(false)
+  const [newParameter, setNewParameter] = useState('')
+  const [showAddTissue, setShowAddTissue] = useState(false)
+  const [newTissue, setNewTissue] = useState('')
+  const [showAddMethod, setShowAddMethod] = useState(false)
+  const [newMethod, setNewMethod] = useState('')
+  const [showAddCondition, setShowAddCondition] = useState(false)
+  const [newCondition, setNewCondition] = useState('')
 
+  // Fetch Data ----------------------------------------------------------------
   useEffect(() => {
     const fetchData = async () => {
 
@@ -57,8 +71,10 @@ export default function Submit() {
       const { data: t } = await supabase.from('tissue').select('*')
       const { data: s } = await supabase.from('source').select('*')
       const { data: o } = await supabase.from('observation').select('*')
+      const { data: hc } = await supabase.from('health_condition').select('*')
 
       const uniqueMethods = [...new Set((o || []).map(x => x.method_type).filter(Boolean))]
+        .map(m => ({ id: m, name: m }))
       const uniqueContext = [...new Set((o || []).map(x => x.measurement_context).filter(Boolean))]
       const uniqueConditions = [...new Set((o || []).map(x => x.health_condition).filter(Boolean))]
       const uniqueAgeRanges = [...new Set((o || []).map(x => x.age_range).filter(Boolean))]
@@ -70,11 +86,13 @@ export default function Submit() {
       setContext(uniqueContext)
       setConditions(uniqueConditions)
       setAgeRanges(uniqueAgeRanges)
+      setHealthConditions(hc || [])
     }
 
     fetchData()
   }, [])
 
+  // Handlers ----------------------------------------------------------------
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
@@ -90,7 +108,7 @@ export default function Submit() {
       value: '',
       sex: '',
       health_status: '',
-      health_condition: '',
+      health_condition_id: '', // ✅ FIXED
       age_range: ''
     }])
   }
@@ -107,7 +125,7 @@ export default function Submit() {
       age_range: '',
       sex: '',
       health_status: '',
-      health_condition: '',
+      health_condition_id: '', // ✅ FIXED
       n: '',
       mean: '',
       sd: '',
@@ -126,32 +144,60 @@ export default function Submit() {
   }
 
   const handleAddParameter = async (name) => {
-    const { data, error } = await supabase.from('parameter').insert([{ name }]).select()
-    if (error) return console.error(error)
+    const { data, error } = await supabase
+      .from('parameter')
+      .insert([{ name }])
+      .select()
 
-    setParameters([...parameters, data[0]])
-    setForm({ ...form, parameter_id: data[0].id })
+    if (error) throw error
+
+    const newItem = data[0]
+
+    setParameters(prev => [...prev, newItem])
+    setForm(prev => ({ ...prev, parameter_id: newItem.id }))
+
+    return newItem // ✅ ADD THIS
   }
 
   const handleAddTissue = async (name) => {
-    const { data, error } = await supabase.from('tissue').insert([{ name }]).select()
-    if (error) return console.error(error)
+    const { data, error } = await supabase
+      .from('tissue')
+      .insert([{ name }])
+      .select()
 
-    setTissues([...tissues, data[0]])
-    setForm({ ...form, tissue_id: data[0].id })
+    if (error) throw error
+
+    const newItem = data[0]
+
+    setTissues(prev => [...prev, newItem])
+    setForm(prev => ({ ...prev, tissue_id: newItem.id }))
+
+    return newItem // ✅
   }
 
   const handleAddSource = async (name) => {
-    const { data, error } = await supabase.from('source').insert([{ title: name }]).select()
-    if (error) return console.error(error)
+    const { data, error } = await supabase
+      .from('source')
+      .insert([{ title: name }])
+      .select()
 
-    setSources([...sources, data[0]])
-    setForm({ ...form, source_id: data[0].id })
+    if (error) throw error
+
+    const newItem = data[0]
+
+    setSources(prev => [...prev, newItem])
+    setForm(prev => ({ ...prev, source_id: newItem.id }))
+
+    return newItem // ✅
   }
 
   const handleAddMethod = async (name) => {
-    setMethods([...methods, name])
-    setForm({ ...form, method_type: name })
+    const newItem = { id: name, name }
+
+    setMethods(prev => [...prev, newItem])
+    setForm(prev => ({ ...prev, method_type: name }))
+
+    return newItem
   }
 
   const validate = () => {
@@ -167,6 +213,55 @@ export default function Submit() {
   }
 
   const toNumber = (val) => val ? Number(val) : null
+
+  const handleAddHealthCondition = async (name) => {
+    const { data, error } = await supabase
+      .from('health_condition')
+      .insert([{ name }])
+      .select()
+
+    if (error) throw error
+
+    const newItem = data[0]
+
+    setHealthConditions(prev => [...prev, newItem])
+
+    return newItem
+  }
+
+  const handleSaveSource = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('source')
+        .insert([{
+          title: sourceDraft.title,
+          doi: sourceDraft.doi,
+          journal: sourceDraft.journal,
+          year: sourceDraft.year ? Number(sourceDraft.year) : null
+        }])
+        .select()
+
+      if (error) throw error
+
+      const newItem = data[0]
+
+      // update local state
+      setSources(prev => [...prev, newItem])
+
+      // auto-select it in the form
+      setForm(prev => ({
+        ...prev,
+        source_id: newItem.id
+      }))
+
+      // close modal
+      setShowSourceForm(false)
+
+    } catch (err) {
+      console.error(err)
+      alert("Failed to save source")
+    }
+  }
 
   const handleSubmit = async () => {
     if (!validate()) return
@@ -200,7 +295,7 @@ export default function Submit() {
               age_range: c.age_range,
               sex: c.sex,
               health_status: c.health_status,
-              health_condition: c.health_condition,
+              health_condition_id: c.health_condition_id || null,
               n: toNumber(c.n)
             }])
             .select()
@@ -223,7 +318,7 @@ export default function Submit() {
 
       // RAW
       if (measurementType === 'raw') {
-
+ 
         for (let i = 0; i < rawData.length; i++) {
           const row = rawData[i]
           if (!row.value) continue
@@ -235,7 +330,7 @@ export default function Submit() {
               label: `Sample ${i + 1}`,
               sex: row.sex,
               health_status: row.health_status,
-              health_condition: row.health_condition,
+              health_condition_id: row.health_condition_id || null,
               age_range: row.age_range
             }])
             .select()
@@ -263,6 +358,8 @@ export default function Submit() {
     setLoading(false)
   }
 
+
+  // User Interface ----------------------------------------------------------------
   return (
     <main style={{ padding: 30, maxWidth: 700, margin: 'auto' }}>
 
@@ -274,6 +371,17 @@ export default function Submit() {
         onSelect={(id) => setForm({ ...form, source_id: id })}
         onAddNew={handleAddSource}
       />
+      <button onClick={() => {
+        setSourceDraft({
+          title: '',
+          doi: '',
+          journal: '',
+          year: ''
+        })
+        setShowSourceForm(true)
+      }}>
+        ➕ Add New Source
+      </button>
 
       <div style={card}>
         <h3>Observation</h3>
@@ -284,6 +392,31 @@ export default function Submit() {
           onSelect={(id) => setForm({ ...form, parameter_id: id })}
           onAddNew={handleAddParameter}
         />
+        <button onClick={() => setShowAddParameter(true)}>
+          ➕ Add Parameter
+        </button>
+
+        {showAddParameter && (
+          <div style={{ marginTop: 10 }}>
+            <input
+              placeholder="New parameter"
+              value={newParameter}
+              onChange={(e) => setNewParameter(e.target.value)}
+            />
+
+            <button onClick={async () => {
+              const item = await handleAddParameter(newParameter)
+              setNewParameter('')
+              setShowAddParameter(false)
+            }}>
+              Save
+            </button>
+
+            <button onClick={() => setShowAddParameter(false)}>
+              Cancel
+            </button>
+          </div>
+        )}
 
         <SearchSelect label="Tissue" data={tissues}
           display={(t) => t.name}
@@ -291,13 +424,65 @@ export default function Submit() {
           onSelect={(id) => setForm({ ...form, tissue_id: id })}
           onAddNew={handleAddTissue}
         />
+        <button onClick={() => setShowAddTissue(true)}>
+          ➕ Add Tissue
+        </button>
+
+        {showAddTissue && (
+          <div style={{ marginTop: 10 }}>
+            <input
+              placeholder="New tissue"
+              value={newTissue}
+              onChange={(e) => setNewTissue(e.target.value)}
+              autoFocus
+            />
+
+            <button onClick={async () => {
+              await handleAddTissue(newTissue)
+              setNewTissue('')
+              setShowAddTissue(false)
+            }}>
+              Save
+            </button>
+
+            <button onClick={() => setShowAddTissue(false)}>
+              Cancel
+            </button>
+          </div>
+        )}
 
         <SearchSelect label="Method" data={methods}
-          display={(m) => m}
+          display={(m) => m.name}
           value={form.method_type}
           onSelect={(val) => setForm({ ...form, method_type: val })}
           onAddNew={handleAddMethod}
         />
+        <button onClick={() => setShowAddMethod(true)}>
+          ➕ Add Method
+        </button>
+
+        {showAddMethod && (
+          <div style={{ marginTop: 10 }}>
+            <input
+              placeholder="New method"
+              value={newMethod}
+              onChange={(e) => setNewMethod(e.target.value)}
+              autoFocus
+            />
+
+            <button onClick={async () => {
+              await handleAddMethod(newMethod)
+              setNewMethod('')
+              setShowAddMethod(false)
+            }}>
+              Save
+            </button>
+
+            <button onClick={() => setShowAddMethod(false)}>
+              Cancel
+            </button>
+          </div>
+        )}
 
         <SearchSelect label="Context" data={context}
           display={(c) => c}
@@ -377,11 +562,40 @@ export default function Submit() {
                     </td>
 
                     <td style={td}>
-                      <InlineSearchSelect
-                        value={c.health_condition}
-                        data={conditions}
-                        onSelect={(val) => updateCohort(i, 'health_condition', val)}
+                      <SearchSelect
+                        label=""
+                        data={healthConditions}
+                        display={(c) => c.name}
+                        value={c.health_condition_id}
+                        onSelect={(id) => updateCohort(i, 'health_condition_id', id)}
+                        onAddNew={handleAddHealthCondition}
                       />
+                      <button onClick={() => setShowAddCondition(true)}>
+                        ➕ Add Condition
+                      </button>
+
+                      {showAddCondition && (
+                        <div style={{ marginTop: 10 }}>
+                          <input
+                            placeholder="New condition"
+                            value={newCondition}
+                            onChange={(e) => setNewCondition(e.target.value)}
+                            autoFocus
+                          />
+
+                          <button onClick={async () => {
+                            await handleAddHealthCondition(newCondition)
+                            setNewCondition('')
+                            setShowAddCondition(false)
+                          }}>
+                            Save
+                          </button>
+
+                          <button onClick={() => setShowAddCondition(false)}>
+                            Cancel
+                          </button>
+                        </div>
+                      )}
                     </td>
 
                     <td style={td}>
@@ -472,10 +686,40 @@ export default function Submit() {
                   </td>
 
                   <td style={td}>
-                    <input
-                      value={row.health_condition || ''}
-                      onChange={e => updateRawRow(i, 'health_condition', e.target.value)}
+                    <SearchSelect
+                      label=""
+                      data={healthConditions}
+                      display={(c) => c.name}
+                      value={row.health_condition_id}
+                      onSelect={(id) => updateCohort(i, 'health_condition_id', id)}
+                      onAddNew={handleAddHealthCondition}
                     />
+                    <button onClick={() => setShowAddCondition(true)}>
+                      ➕ Add Condition
+                    </button>
+
+                    {showAddCondition && (
+                      <div style={{ marginTop: 10 }}>
+                        <input
+                          placeholder="New condition"
+                          value={newCondition}
+                          onChange={(e) => setNewCondition(e.target.value)}
+                          autoFocus
+                        />
+
+                        <button onClick={async () => {
+                          await handleAddHealthCondition(newCondition)
+                          setNewCondition('')
+                          setShowAddCondition(false)
+                        }}>
+                          Save
+                        </button>
+
+                        <button onClick={() => setShowAddCondition(false)}>
+                          Cancel
+                        </button>
+                      </div>
+                    )}
                   </td>
 
                   <td style={td}>
@@ -498,85 +742,110 @@ export default function Submit() {
         {loading ? "Submitting..." : "Submit"}
       </button>
 
+      {showSourceForm && (
+        <div style={modalOverlay}>
+          <div style={modalCard}>
+
+            <h2>Add Source</h2>
+
+            <input
+              placeholder="DOI"
+              value={sourceDraft.doi}
+              onChange={(e) =>
+                setSourceDraft({ ...sourceDraft, doi: e.target.value })
+              }
+            />
+
+            <input
+              placeholder="Title"
+              value={sourceDraft.title}
+              onChange={(e) =>
+                setSourceDraft({ ...sourceDraft, title: e.target.value })
+              }
+            />
+
+            <input
+              placeholder="Journal"
+              value={sourceDraft.journal}
+              onChange={(e) =>
+                setSourceDraft({ ...sourceDraft, journal: e.target.value })
+              }
+            />
+
+            <input
+              placeholder="Year"
+              value={sourceDraft.year}
+              onChange={(e) =>
+                setSourceDraft({ ...sourceDraft, year: e.target.value })
+              }
+            />
+
+            <div style={{ marginTop: 15, display: 'flex', gap: 10 }}>
+              <button onClick={handleSaveSource}>Save</button>
+              <button onClick={() => setShowSourceForm(false)}>Cancel</button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </main>
   )
 }
 
-// components unchanged ↓
-function SearchSelect({ label, data, display, value, onSelect, onAddNew }) {
+// Reusable components ----------------------------------------------------------------
+function SearchSelect({ label, data, display, value, onSelect }) {
   const [search, setSearch] = useState('')
+  const [focused, setFocused] = useState(false)
+
+  const selectedItem = data.find(d => d.id === value)
 
   const filtered = data.filter(d =>
     display(d).toLowerCase().includes(search.toLowerCase())
   )
 
-  const showAdd = search && filtered.length === 0 && onAddNew
+  const handleSelect = (item) => {
+    onSelect(item.id)
+    setSearch('')
+    setFocused(false)
+  }
 
   return (
     <div style={card}>
-      <h3>{label}</h3>
+      {label && <h3>{label}</h3>}
 
-      <input placeholder={`Search ${label}`}
-        value={search}
-        onChange={(e) => setSearch(e.target.value)} />
-
-      {filtered.map(d => (
-        <div key={d.id || d}
-          onClick={() => onSelect(d.id || d)}>
-          {display(d)}
-        </div>
-      ))}
-
-      {showAdd && (
-        <div onClick={() => onAddNew(search)}>
-          ➕ Add "{search}"
-        </div>
-      )}
-    </div>
-  )
-}
-
-function InlineSearchSelect({ value, data, onSelect }) {
-  const [search, setSearch] = useState(value || '')
-  const [open, setOpen] = useState(false)
-
-  const filtered = data.filter(d =>
-    d.toLowerCase().includes(search.toLowerCase())
-  )
-
-  return (
-    <div style={{ position: 'relative' }}>
       <input
-        value={search}
-        onFocus={() => setOpen(true)}
-        onChange={(e) => {
-          setSearch(e.target.value)
-          onSelect(e.target.value)
-        }}
-        placeholder="Condition"
+        placeholder={`Search ${label}`}
+        value={
+          focused
+            ? search
+            : (selectedItem ? display(selectedItem) : '')
+        }
+        onFocus={() => setFocused(true)}
+        onBlur={() => setTimeout(() => setFocused(false), 100)}
+        onChange={(e) => setSearch(e.target.value)}
       />
 
-      {open && (
+      {focused && (
         <div style={{
-          position: 'absolute',
-          background: 'white',
+          marginTop: 5,
           border: '1px solid #ccc',
-          zIndex: 10,
-          maxHeight: 120,
+          borderRadius: 6,
+          maxHeight: 150,
           overflowY: 'auto',
-          width: '100%'
+          background: 'white'
         }}>
-          {filtered.map((item, i) => (
+          {filtered.map(d => (
             <div
-              key={i}
-              onClick={() => {
-                setSearch(item)
-                onSelect(item)
-                setOpen(false)
+              key={d.id}
+              onClick={() => handleSelect(d)}
+              style={{
+                padding: 6,
+                cursor: 'pointer',
+                background: value === d.id ? '#e6ffe6' : 'transparent'
               }}
-              style={{ padding: 5, cursor: 'pointer' }}
             >
-              {item}
+              {display(d)}
             </div>
           ))}
         </div>
@@ -585,6 +854,8 @@ function InlineSearchSelect({ value, data, onSelect }) {
   )
 }
 
+
+// Styling ----------------------------------------------------------------
 const card = {
   border: '1px solid #00850f',
   padding: 20,
@@ -601,4 +872,39 @@ const td = {
   borderBottom: '1px solid #00850f', 
   padding: '4px' 
 } 
-const numInput = { width: '70px' }
+const numInput = { 
+  width: '70px' 
+}
+
+const addButton = {
+  marginTop: 8,
+  padding: '6px 10px',
+  border: '1px solid #00850f',
+  borderRadius: 6,
+  background: '#e6ffe6',
+  cursor: 'pointer'
+}
+
+const modalOverlay = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  width: '100vw',
+  height: '100vh',
+  background: 'rgba(0,0,0,0.4)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 1000
+}
+
+const modalCard = {
+  background: 'white',
+  padding: 25,
+  borderRadius: 12,
+  width: 400,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 10,
+  boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
+}
